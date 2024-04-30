@@ -56,7 +56,7 @@ EXTRA_DIST = \
 
 
 dist-hook:
-	git log --date=short --pretty="format:@%cd  %an  <%ae>  [%H]%n%n%s%n%n%e%b" | sed -e "s|^\([^@]\)|\t\1|" -e "s|^@||" >$(distdir)/ChangeLog
+	git log --date=short --pretty="format:@%cd  %an  <%ae>  [%H]%n%n%s%n%n%e%b" | sed -e "s|^\([^@]\)|\t\1|" -e "s|^@||" -e "s/bitching/complaining/g" >$(distdir)/ChangeLog
 	perl -pi -e 's/\n/\r\n/g' `find $(distdir) -name '*.ds?'` \
 		$(distdir)/contrib/msvc/*			  \
 		$(distdir)/INSTALL-WIN32.txt
