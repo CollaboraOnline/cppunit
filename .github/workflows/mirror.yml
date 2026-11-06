@@ -1,0 +1,52 @@
+name: Mirror LibreOffice cppunit
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Mirror upstream branches and tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init --bare mirror.git
+          cd mirror.git
+          git remote add upstream https://git.libreoffice.org/cppunit
+          git fetch --no-tags upstream \
+            '+refs/heads/*:refs/heads/*' \
+            '+refs/tags/*:refs/tags/*'
+
+          # main holds this workflow and must never be overwritten by upstream.
+          if git show-ref --verify --quiet refs/heads/main; then
+            echo 'Upstream now has a main branch; choose a new automation branch before syncing.' >&2
+            exit 1
+          fi
+
+          git remote add github "https://github.com/${GITHUB_REPOSITORY}.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" \
+            fetch --no-tags github refs/heads/main:refs/heads/main
+
+          # Preserve main, mirror every upstream branch/tag, and delete stale refs.
+          # Atomic updates ensure that a rejected ref leaves the mirror unchanged.
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" \
+            push --atomic --prune github \
+            '+refs/heads/*:refs/heads/*' \
+            '+refs/tags/*:refs/tags/*'
